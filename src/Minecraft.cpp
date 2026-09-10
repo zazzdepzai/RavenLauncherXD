@@ -3,7 +3,6 @@
 #include "Minecraft.h"
 #include "DownloadManager.h"
 #include "Settings.h"
-#include <windows.h>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -21,7 +20,6 @@ static std::string joinPath(const std::string& a, const std::string& b) {
     return (fs::path(a) / b).string();
 }
 
-// ---------- Java discovery ----------
 std::string Minecraft::FindJava() {
     auto& d = Settings::I().d();
     if (!d.javaPath.empty() && DownloadManager::FileExists(d.javaPath)) return d.javaPath;
@@ -34,7 +32,6 @@ std::string Minecraft::FindJava() {
         p = joinPath(buf, "bin\\java.exe");
         if (DownloadManager::FileExists(p)) return p;
     }
-    // Common install paths
     const char* guesses[] = {
         "C:\\Program Files\\Java\\jre1.8.0_401\\bin\\javaw.exe",
         "C:\\Program Files\\Java\\jre1.8.0_391\\bin\\javaw.exe",
@@ -44,7 +41,6 @@ std::string Minecraft::FindJava() {
     };
     for (auto g : guesses) if (DownloadManager::FileExists(g)) return g;
 
-    // PATH
     char pathBuf[32768];
     if (GetEnvironmentVariableA("PATH", pathBuf, sizeof(pathBuf))) {
         std::stringstream ss(pathBuf);
@@ -59,7 +55,6 @@ std::string Minecraft::FindJava() {
     return "";
 }
 
-// ---------- Vanilla install ----------
 static bool fetchManifest(json& out) {
     std::string body;
     if (!DownloadManager::DownloadToString(MANIFEST_URL, body)) return false;
@@ -74,13 +69,13 @@ static bool fetchVersionJson(const std::string& url, json& out) {
     return true;
 }
 
-static void downloadAllLibraries(const std::string& mcDir, const json& vjson, Minecraft::StatusFn st, float base, float span) {
+static void downloadAllLibraries(const std::string& mcDir, const json& vjson,
+                                 Minecraft::StatusFn st, float base, float span) {
     if (!vjson.contains("libraries")) return;
     auto libs = vjson["libraries"];
     int total = (int)libs.size();
     int done = 0;
     for (auto& lib : libs) {
-        // Skip if rules disallow
         if (lib.contains("rules")) {
             bool allow = false;
             for (auto& r : lib["rules"]) {
@@ -93,7 +88,6 @@ static void downloadAllLibraries(const std::string& mcDir, const json& vjson, Mi
             }
             if (!allow) { done++; continue; }
         }
-        // natives
         if (lib.contains("natives")) {
             std::string cls = lib["natives"].value("windows","");
             if (!cls.empty() && lib.contains("downloads") && lib["downloads"].contains("classifiers") &&
@@ -121,7 +115,8 @@ static void downloadAllLibraries(const std::string& mcDir, const json& vjson, Mi
     }
 }
 
-static void downloadAssets(const std::string& mcDir, const json& vjson, Minecraft::StatusFn st, float base, float span) {
+static void downloadAssets(const std::string& mcDir, const json& vjson,
+                           Minecraft::StatusFn st, float base, float span) {
     if (!vjson.contains("assetIndex")) return;
     auto& ai = vjson["assetIndex"];
     std::string idxUrl  = ai.value("url","");
@@ -147,7 +142,8 @@ static void downloadAssets(const std::string& mcDir, const json& vjson, Minecraf
             DownloadManager::Download(url, dst);
         }
         done++;
-        if ((done % 50) == 0 && st) st("Downloading assets...", base + span * (float)done / (std::max)(1,total));
+        if ((done % 50) == 0 && st)
+            st("Downloading assets...", base + span * (float)done / (std::max)(1,total));
     }
 }
 
@@ -172,7 +168,6 @@ bool Minecraft::EnsureVanilla(const std::string& mcDir, StatusFn st) {
     json vjson;
     if (!fetchVersionJson(vjsonUrl, vjson)) return false;
 
-    // client.jar
     std::string clientUrl = vjson["downloads"]["client"].value("url","");
     std::string verDir = joinPath(mcDir, "versions/1.8.9");
     DownloadManager::EnsureDir(verDir);
@@ -181,7 +176,6 @@ bool Minecraft::EnsureVanilla(const std::string& mcDir, StatusFn st) {
         if (st) st("Downloading Minecraft client...", 0.10f);
         DownloadManager::Download(clientUrl, clientDst);
     }
-    // save version json
     std::string vjsonDst = joinPath(verDir, "1.8.9.json");
     { std::ofstream o(vjsonDst); o << vjson.dump(); }
 
@@ -191,11 +185,9 @@ bool Minecraft::EnsureVanilla(const std::string& mcDir, StatusFn st) {
     return true;
 }
 
-// ---------- Forge install ----------
 bool Minecraft::EnsureForge(const std::string& mcDir, const std::string& javaPath,
                             StatusFn st, std::string& outVersionId)
 {
-    // Forge 1.8.9-11.15.1.2318
     const std::string fv = "1.8.9-11.15.1.2318-1.8.9";
     outVersionId = "1.8.9-forge1.8.9-11.15.1.2318-1.8.9";
 
@@ -213,7 +205,6 @@ bool Minecraft::EnsureForge(const std::string& mcDir, const std::string& javaPat
 
     if (st) st("Installing Forge (silent)...", 0.60f);
 
-    // java -jar installer --installClient <mcDir>
     std::string cmd = "\"" + javaPath + "\" -jar \"" + instPath + "\" --installClient \"" + mcDir + "\"";
     STARTUPINFOA si{}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi{};
@@ -229,7 +220,6 @@ bool Minecraft::EnsureForge(const std::string& mcDir, const std::string& javaPat
     return DownloadManager::FileExists(marker);
 }
 
-// ---------- OptiFine ----------
 bool Minecraft::EnsureOptiFine(const std::string& mcDir, StatusFn st) {
     std::string modsDir = joinPath(mcDir, "mods");
     DownloadManager::EnsureDir(modsDir);
@@ -237,17 +227,14 @@ bool Minecraft::EnsureOptiFine(const std::string& mcDir, StatusFn st) {
     if (DownloadManager::FileExists(dst)) return true;
 
     if (st) st("Downloading OptiFine...", 0.50f);
-    // Official OptiFine download mirror
-    std::string url = "https://optifine.net/adloadx?f=OptiFine_1.8.9_HD_U_M5.jar";
-    // Fallback: use BMCLAPI mirror
     std::string mirror = "https://bmclapi2.bangbang93.com/optifine/1.8.9/HD_U_M5";
     if (!DownloadManager::Download(mirror, dst)) {
+        std::string url = "https://optifine.net/adloadx?f=OptiFine_1.8.9_HD_U_M5.jar";
         if (!DownloadManager::Download(url, dst)) return false;
     }
     return DownloadManager::FileExists(dst);
 }
 
-// ---------- Build classpath from version JSON ----------
 static std::string buildClasspath(const std::string& mcDir, const json& vjson, const std::string& versionId) {
     std::vector<std::string> parts;
     if (vjson.contains("libraries")) {
@@ -270,7 +257,6 @@ static std::string buildClasspath(const std::string& mcDir, const json& vjson, c
             }
         }
     }
-    // client.jar / forge jar
     std::string cj = joinPath(mcDir, "versions/" + versionId + "/" + versionId + ".jar");
     if (!DownloadManager::FileExists(cj))
         cj = joinPath(mcDir, "versions/1.8.9/1.8.9.jar");
@@ -283,7 +269,6 @@ static std::string buildClasspath(const std::string& mcDir, const json& vjson, c
     return cp;
 }
 
-// ---------- Launch ----------
 LaunchResult Minecraft::Launch(const std::string& mcDir,
                                const std::string& javaPath,
                                const std::string& versionId,
@@ -300,11 +285,9 @@ LaunchResult Minecraft::Launch(const std::string& mcDir,
     std::string mainClass = vjson.value("mainClass", "net.minecraft.client.main.Main");
     std::string cp = buildClasspath(mcDir, vjson, versionId);
 
-    // Natives dir
     std::string natives = joinPath(mcDir, "versions/" + versionId + "/natives");
     DownloadManager::EnsureDir(natives);
 
-    // Extract natives from all libs
     for (auto& lib : vjson["libraries"]) {
         if (lib.contains("natives")) {
             std::string cls = lib["natives"].value("windows","");
@@ -314,34 +297,26 @@ LaunchResult Minecraft::Launch(const std::string& mcDir,
                 std::string rel = lib["downloads"]["classifiers"][cls].value("path","");
                 std::string jar = joinPath(mcDir, "libraries/" + rel);
                 if (DownloadManager::FileExists(jar)) {
-                    // extract jar entries ending in .dll
-                    std::ifstream jf(jar, std::ios::binary);
-                    if (jf) {
-                        // Use miniz to unzip .dll files
-                        // skip - too involved; use PowerShell Expand-Archive fallback
-                        std::string ps =
-                            "powershell -NoProfile -Command \"Add-Type -A System.IO.Compression.FileSystem;"
-                            "[IO.Compression.ZipFile]::ExtractToDirectory('" + jar + "','" + natives + "')\"";
-                        STARTUPINFOA si{}; si.cb = sizeof(si);
-                        PROCESS_INFORMATION pi{};
-                        std::vector<char> c(ps.begin(), ps.end()); c.push_back(0);
-                        if (CreateProcessA(nullptr, c.data(), nullptr, nullptr, FALSE,
-                                           CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-                            WaitForSingleObject(pi.hProcess, 30000);
-                            CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
-                        }
+                    std::string ps =
+                        "powershell -NoProfile -Command \"Add-Type -A System.IO.Compression.FileSystem;"
+                        "[IO.Compression.ZipFile]::ExtractToDirectory('" + jar + "','" + natives + "')\"";
+                    STARTUPINFOA si{}; si.cb = sizeof(si);
+                    PROCESS_INFORMATION pi{};
+                    std::vector<char> c(ps.begin(), ps.end()); c.push_back(0);
+                    if (CreateProcessA(nullptr, c.data(), nullptr, nullptr, FALSE,
+                                       CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+                        WaitForSingleObject(pi.hProcess, 30000);
+                        CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
                     }
                 }
             }
         }
     }
 
-    // Assets
     std::string assetsDir = joinPath(mcDir, "assets");
     std::string assetIndex = vjson.value("assets", "1.8");
     std::string gameDir = mcDir;
 
-    // Build launch command
     std::stringstream cmd;
     cmd << "\"" << javaPath << "\" ";
     cmd << "-Xmx" << ramMB << "M ";
@@ -366,7 +341,6 @@ LaunchResult Minecraft::Launch(const std::string& mcDir,
     PROCESS_INFORMATION pi{};
     std::vector<char> cmdbuf(cmdline.begin(), cmdline.end()); cmdbuf.push_back(0);
 
-    // Set working directory
     BOOL ok = CreateProcessA(nullptr, cmdbuf.data(), nullptr, nullptr, FALSE, 0,
                              nullptr, mcDir.c_str(), &si, &pi);
     if (!ok) { r.error = "Failed to start Minecraft"; return r; }
