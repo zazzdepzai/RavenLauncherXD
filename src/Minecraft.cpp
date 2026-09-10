@@ -117,7 +117,7 @@ static void downloadAllLibraries(const std::string& mcDir, const json& vjson, Mi
             }
         }
         done++;
-        if (st) st("Downloading libraries...", base + span * (float)done / std::max(1,total));
+        if (st) st("Downloading libraries...", base + span * (float)done / (std::max)(1,total));
     }
 }
 
