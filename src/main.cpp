@@ -4,6 +4,7 @@
 #include <dwmapi.h>
 #include <wincodec.h>
 #include <vector>
+#include <string>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -23,8 +24,78 @@ static ID3D11RenderTargetView* g_mainRTV     = nullptr;
 static UINT              g_ResizeW = 0, g_ResizeH = 0;
 static HWND              g_hWnd = nullptr;
 
+// ImGui fonts (global — UI.cpp sẽ dùng)
+ImFont* g_fontRegular = nullptr;
+ImFont* g_fontBold    = nullptr;
+ImFont* g_fontBig     = nullptr;
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
+// ============ FONT LOADER ============
+static std::string FindFontFile(const char* name) {
+    char winDir[MAX_PATH];
+    GetWindowsDirectoryA(winDir, MAX_PATH);
+    std::string p = std::string(winDir) + "\\Fonts\\" + name;
+    if (GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES) return p;
+
+    // User fonts
+    char appData[MAX_PATH];
+    if (GetEnvironmentVariableA("LOCALAPPDATA", appData, MAX_PATH)) {
+        std::string p2 = std::string(appData) + "\\Microsoft\\Windows\\Fonts\\" + name;
+        if (GetFileAttributesA(p2.c_str()) != INVALID_FILE_ATTRIBUTES) return p2;
+    }
+    return "";
+}
+
+static void LoadFonts() {
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Cố gắng load SF Pro Display (nếu có) → fallback Segoe UI
+    std::string regularPaths[] = {
+        FindFontFile("SF-Pro-Display-Regular.otf"),
+        FindFontFile("SFProDisplay-Regular.otf"),
+        FindFontFile("segoeui.ttf"),
+    };
+    std::string boldPaths[] = {
+        FindFontFile("SF-Pro-Display-Bold.otf"),
+        FindFontFile("SFProDisplay-Bold.otf"),
+        FindFontFile("segoeuib.ttf"),
+    };
+    std::string blackPaths[] = {
+        FindFontFile("SF-Pro-Display-Black.otf"),
+        FindFontFile("SFProDisplay-Black.otf"),
+        FindFontFile("segoeuib.ttf"),
+    };
+
+    // Load regular
+    for (auto& p : regularPaths) {
+        if (!p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            g_fontRegular = io.Fonts->AddFontFromFileTTF(p.c_str(), 16.0f);
+            if (g_fontRegular) break;
+        }
+    }
+    // Load bold
+    for (auto& p : boldPaths) {
+        if (!p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            g_fontBold = io.Fonts->AddFontFromFileTTF(p.c_str(), 17.0f);
+            if (g_fontBold) break;
+        }
+    }
+    // Load big (title)
+    for (auto& p : blackPaths) {
+        if (!p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            g_fontBig = io.Fonts->AddFontFromFileTTF(p.c_str(), 26.0f);
+            if (g_fontBig) break;
+        }
+    }
+
+    // Fallback nếu fail hết
+    if (!g_fontRegular) g_fontRegular = io.Fonts->AddFontDefault();
+    if (!g_fontBold)    g_fontBold    = g_fontRegular;
+    if (!g_fontBig)     g_fontBig     = g_fontBold;
+}
+
+// ============ D3D11 ============
 static bool CreateDeviceD3D(HWND hWnd) {
     DXGI_SWAP_CHAIN_DESC sd{};
     sd.BufferCount = 2;
@@ -75,6 +146,7 @@ static void CreateRTV() {
     }
 }
 
+// ============ TEXTURE LOADER (WIC) ============
 void LoadTextureFromMemory(const unsigned char* data, size_t len,
                            ID3D11ShaderResourceView** out)
 {
@@ -91,6 +163,7 @@ void LoadTextureFromMemory(const unsigned char* data, size_t len,
 
     IWICBitmapDecoder* decoder = nullptr;
     factory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
+    if (!decoder) { stream->Release(); factory->Release(); return; }
 
     IWICBitmapFrameDecode* frame = nullptr;
     decoder->GetFrame(0, &frame);
@@ -134,6 +207,7 @@ void LoadTextureFromMemory(const unsigned char* data, size_t len,
     stream->Release(); factory->Release();
 }
 
+// ============ WINDOW PROC ============
 static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
@@ -163,6 +237,7 @@ static void EnableRoundedCorners(HWND hWnd) {
     DwmSetWindowAttribute(hWnd, 19, &dark, sizeof(dark));
 }
 
+// ============ WINMAIN ============
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -203,6 +278,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    LoadFonts();
     UI::ApplyStyle();
 
     ImGui_ImplWin32_Init(g_hWnd);
@@ -211,7 +287,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     Launcher launcher;
     launcher.init();
 
-    // ✅ Khởi động Discord Rich Presence
     DiscordRPC::I().init();
     DiscordRPC::I().setIdle();
 
@@ -250,14 +325,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
         UI::Render(launcher, dt);
 
         ImGui::Render();
-        const float clear[4] = { 0.04f, 0.06f, 0.13f, 1.f };
+        const float clear[4] = { 0.03f, 0.05f, 0.10f, 1.f };
         g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRTV, nullptr);
         g_pd3dDeviceContext->ClearRenderTargetView(g_mainRTV, clear);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         g_pSwapChain->Present(1, 0);
     }
 
-    // ✅ Tắt Discord RPC
     DiscordRPC::I().shutdown();
 
     ImGui_ImplDX11_Shutdown();
