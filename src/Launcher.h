@@ -7,7 +7,7 @@
 #include "ModManager.h"
 #include "Settings.h"
 
-enum class Page { Home, Versions, Mods, Settings };
+enum class Page { Home, Accounts, Versions, Mods, Settings };
 enum class TaskState { Idle, Running, Done, Failed };
 
 struct LauncherState {
