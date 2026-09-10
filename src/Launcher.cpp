@@ -2,6 +2,7 @@
 #include "Launcher.h"
 #include "DownloadManager.h"
 #include "Minecraft.h"
+#include "DiscordRPC.h"
 #include <filesystem>
 #include <thread>
 #include <chrono>
@@ -51,6 +52,9 @@ void Launcher::runLaunchTask() {
         setStatus(phase, pct, 0.f);
     };
 
+    // ✅ Discord: đang chuẩn bị
+    DiscordRPC::I().setLaunching();
+
     std::string java = Minecraft::FindJava();
     if (java.empty()) {
         setStatus("Java not found", 0.f);
@@ -58,6 +62,7 @@ void Launcher::runLaunchTask() {
         m_s.lastError = "Java not found";
         m_s.showJavaPopup = true;
         m_busy.store(false);
+        DiscordRPC::I().setError("Java not found");
         return;
     }
     d.javaPath = java;
@@ -67,6 +72,7 @@ void Launcher::runLaunchTask() {
         m_s.taskState = TaskState::Failed;
         m_s.lastError = "Failed to install Minecraft 1.8.9";
         m_busy.store(false);
+        DiscordRPC::I().setError("Install failed");
         return;
     }
 
@@ -79,6 +85,7 @@ void Launcher::runLaunchTask() {
             m_s.taskState = TaskState::Failed;
             m_s.lastError = "Failed to install Forge 1.8.9";
             m_busy.store(false);
+            DiscordRPC::I().setError("Forge failed");
             return;
         }
         versionId = forgeId;
@@ -90,6 +97,7 @@ void Launcher::runLaunchTask() {
             m_s.taskState = TaskState::Failed;
             m_s.lastError = "Failed to install OptiFine";
             m_busy.store(false);
+            DiscordRPC::I().setError("OptiFine failed");
             return;
         }
     }
@@ -107,8 +115,19 @@ void Launcher::runLaunchTask() {
         m_s.taskState = TaskState::Failed;
         m_s.lastError = res.error;
         m_busy.store(false);
+        DiscordRPC::I().setError("Launch failed");
         return;
     }
+
+    // ✅ Discord: đang chơi
+    std::string verLabel;
+    switch (m_s.selectedVersion) {
+        case 0: verLabel = "Minecraft 1.8.9"; break;
+        case 1: verLabel = "Forge 1.8.9";     break;
+        case 2: verLabel = "Forge 1.8.9 + OptiFine"; break;
+        default: verLabel = "Minecraft 1.8.9"; break;
+    }
+    DiscordRPC::I().setPlaying(d.username, verLabel);
 
     setStatus("Ready to launch", 1.f);
     m_s.taskState = TaskState::Done;
