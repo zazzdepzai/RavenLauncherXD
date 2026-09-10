@@ -1,0 +1,50 @@
+name: Build RavenXD Launcher
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup vcpkg
+        shell: cmd
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+
+      - name: Install deps (static)
+        shell: cmd
+        run: C:\vcpkg\vcpkg install nlohmann-json:x64-windows-static
+
+      - name: Configure
+        shell: cmd
+        run: >
+          cmake -B build -S .
+          -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RavenXD-Launcher
+          path: build/Release/RavenXD-Launcher.exe
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "RavenXD Launcher ${{ github.ref_name }}"
+          files: build/Release/RavenXD-Launcher.exe
+          generate_release_notes: true
