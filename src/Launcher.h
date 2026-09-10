@@ -5,6 +5,7 @@
 #include <thread>
 #include "Minecraft.h"
 #include "ModManager.h"
+#include "AccountManager.h"
 #include "Settings.h"
 
 enum class Page { Home, Accounts, Versions, Mods, Settings };
