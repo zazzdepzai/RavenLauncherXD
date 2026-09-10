@@ -1,3 +1,4 @@
+#include <windows.h>
 #include "Launcher.h"
 #include "DownloadManager.h"
 #include "Minecraft.h"
