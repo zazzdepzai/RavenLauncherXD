@@ -1,3 +1,5 @@
+#define NOMINMAX
+#include <windows.h>
 #include "Minecraft.h"
 #include "DownloadManager.h"
 #include "Settings.h"
