@@ -7,8 +7,8 @@ struct ModEntry {
     std::string name;
     std::string fileName;
     std::string version;
-    std::string source;      // "GitHub Release"
-    std::string url;         // download URL
+    std::string source;
+    std::string url;
     bool enabled = true;
     bool installed = false;
 };
