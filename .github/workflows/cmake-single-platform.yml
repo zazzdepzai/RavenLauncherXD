@@ -21,7 +21,9 @@ jobs:
 
       - name: Install deps (static)
         shell: cmd
-        run: C:\vcpkg\vcpkg install nlohmann-json:x64-windows-static
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+        run: C:\vcpkg\vcpkg install
 
       - name: Configure
         shell: cmd
