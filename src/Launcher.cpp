@@ -30,7 +30,7 @@ void Launcher::setStatus(const std::string& s, float pct, float bps) {
 void Launcher::tick(float dt) {
     if (m_s.showLoadingScreen) {
         m_s.loadingTimer += dt;
-        m_s.loadingPhase = m_s.loadingTimer / 2.0f;      // 2 sec loading screen
+        m_s.loadingPhase = m_s.loadingTimer / 2.0f;
         if (m_s.loadingTimer >= 2.0f) m_s.showLoadingScreen = false;
     }
 }
@@ -51,7 +51,6 @@ void Launcher::runLaunchTask() {
         setStatus(phase, pct, 0.f);
     };
 
-    // 1) Java check
     std::string java = Minecraft::FindJava();
     if (java.empty()) {
         setStatus("Java not found", 0.f);
@@ -63,7 +62,6 @@ void Launcher::runLaunchTask() {
     }
     d.javaPath = java;
 
-    // 2) Vanilla
     setStatus("Checking Minecraft 1.8.9...", 0.02f);
     if (!Minecraft::EnsureVanilla(d.minecraftDir, status)) {
         m_s.taskState = TaskState::Failed;
@@ -74,7 +72,6 @@ void Launcher::runLaunchTask() {
 
     std::string versionId = "1.8.9";
 
-    // 3) Forge
     if (m_s.selectedVersion >= 1) {
         setStatus("Checking Forge 1.8.9...", 0.5f);
         std::string forgeId;
@@ -87,7 +84,6 @@ void Launcher::runLaunchTask() {
         versionId = forgeId;
     }
 
-    // 4) OptiFine
     if (m_s.selectedVersion >= 2) {
         setStatus("Checking OptiFine...", 0.8f);
         if (!Minecraft::EnsureOptiFine(d.minecraftDir, status)) {
@@ -98,13 +94,11 @@ void Launcher::runLaunchTask() {
         }
     }
 
-    // 5) Mods
     setStatus("Downloading mods...", 0.9f);
     m_mods.downloadMissing(d.minecraftDir, [this](const std::string& s, float p){
         setStatus(s, 0.9f + 0.05f * p);
     });
 
-    // 6) Launch
     setStatus("Launching Minecraft...", 0.98f);
     auto res = Minecraft::Launch(d.minecraftDir, java, versionId,
                                  d.username, d.ramMB,
@@ -121,7 +115,6 @@ void Launcher::runLaunchTask() {
     m_busy.store(false);
 
     if (d.closeAfterLaunch) {
-        // Signal main loop to exit
         PostQuitMessage(0);
     }
 }
