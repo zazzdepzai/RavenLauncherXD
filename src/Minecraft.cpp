@@ -147,7 +147,7 @@ static void downloadAssets(const std::string& mcDir, const json& vjson, Minecraf
             DownloadManager::Download(url, dst);
         }
         done++;
-        if ((done % 50) == 0 && st) st("Downloading assets...", base + span * (float)done / std::max(1,total));
+        if ((done % 50) == 0 && st) st("Downloading assets...", base + span * (float)done / (std::max)(1,total));
     }
 }
 
