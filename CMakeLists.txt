@@ -71,14 +71,8 @@ add_executable(RavenXD-Launcher WIN32
     src/ModManager.cpp
     src/Settings.cpp
     src/DiscordRPC.cpp
+    src/AccountManager.cpp
     src/UI/UI.cpp
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
-)
 
 target_include_directories(RavenXD-Launcher PRIVATE
     src
