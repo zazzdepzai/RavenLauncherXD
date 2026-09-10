@@ -1,4 +1,5 @@
 #include "UI.h"
+#include "../DiscordRPC.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "embedded_assets.h"
