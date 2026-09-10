@@ -82,7 +82,6 @@ add_executable(RavenXD-Launcher WIN32
     src/ModManager.cpp
     src/Settings.cpp
     src/DiscordRPC.cpp
-    src/AccountManager.cpp
     src/UI/UI.cpp
 
 target_include_directories(RavenXD-Launcher PRIVATE
