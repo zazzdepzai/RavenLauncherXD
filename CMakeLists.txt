@@ -16,6 +16,7 @@ FetchContent_Declare(imgui
 FetchContent_MakeAvailable(imgui)
 
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(discord-rpc CONFIG REQUIRED)
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/assets/ravenxd.png")
     file(READ "${CMAKE_SOURCE_DIR}/assets/ravenxd.png" RAVENXD_LOGO_HEX HEX)
@@ -36,6 +37,7 @@ add_executable(RavenXD-Launcher WIN32
     src/Minecraft.cpp
     src/ModManager.cpp
     src/Settings.cpp
+    src/DiscordRPC.cpp
     src/UI/UI.cpp
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -54,6 +56,7 @@ target_include_directories(RavenXD-Launcher PRIVATE
 
 target_link_libraries(RavenXD-Launcher PRIVATE
     nlohmann_json::nlohmann_json
+    discord-rpc
     d3d11 dxgi d3dcompiler dwmapi winhttp shlwapi version ole32 comctl32 shell32
     windowscodecs
 )
