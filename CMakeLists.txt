@@ -62,6 +62,17 @@ static const unsigned char RAVENXD_LOGO_PNG[] = { ${RAVENXD_LOGO_BYTES} };
 static const unsigned int  RAVENXD_LOGO_PNG_SIZE = sizeof(RAVENXD_LOGO_PNG);
 ")
 
+# Embed background
+if(EXISTS "${CMAKE_SOURCE_DIR}/assets/background.png")
+    file(READ "${CMAKE_SOURCE_DIR}/assets/background.png" BG_HEX HEX)
+    string(REGEX REPLACE "(..)" "0x\\1," BG_BYTES "${BG_HEX}")
+else()
+    set(BG_BYTES "0x00")
+endif()
+file(APPEND "${CMAKE_BINARY_DIR}/embedded_assets.h"
+"static const unsigned char RAVENXD_BG_PNG[] = { ${BG_BYTES} };
+static const unsigned int  RAVENXD_BG_PNG_SIZE = sizeof(RAVENXD_BG_PNG);
+")
 # ---------- Executable ----------
 add_executable(RavenXD-Launcher WIN32
     src/main.cpp
