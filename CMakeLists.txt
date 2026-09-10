@@ -4,25 +4,19 @@ project(RavenXD-Launcher VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Static CRT → single exe
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
-# Cho phép các dep cũ (imgui) chạy được với CMake 4.x
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 
 include(FetchContent)
 
-# ---------- ImGui ----------
 FetchContent_Declare(imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
     GIT_TAG v1.90.5
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(imgui)
 
-# ---------- nlohmann/json (từ vcpkg) ----------
 find_package(nlohmann_json CONFIG REQUIRED)
 
-# ---------- Embed assets/ravenxd.png as C array ----------
 if(EXISTS "${CMAKE_SOURCE_DIR}/assets/ravenxd.png")
     file(READ "${CMAKE_SOURCE_DIR}/assets/ravenxd.png" RAVENXD_LOGO_HEX HEX)
     string(REGEX REPLACE "(..)" "0x\\1," RAVENXD_LOGO_BYTES "${RAVENXD_LOGO_HEX}")
