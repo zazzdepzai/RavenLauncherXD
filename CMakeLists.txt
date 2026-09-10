@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Static CRT → single exe
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# Cho phép các dep cũ (imgui) chạy được với CMake 4.x
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+
 include(FetchContent)
 
 # ---------- ImGui ----------
@@ -16,14 +19,7 @@ FetchContent_Declare(imgui
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(imgui)
 
-# ---------- miniz ----------
-FetchContent_Declare(miniz
-    GIT_REPOSITORY https://github.com/richgel999/miniz.git
-    GIT_TAG 3.0.2
-    GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(miniz)
-
-# ---------- nlohmann/json ----------
+# ---------- nlohmann/json (từ vcpkg) ----------
 find_package(nlohmann_json CONFIG REQUIRED)
 
 # ---------- Embed assets/ravenxd.png as C array ----------
@@ -60,13 +56,12 @@ target_include_directories(RavenXD-Launcher PRIVATE
     ${CMAKE_BINARY_DIR}
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
-    ${miniz_SOURCE_DIR}
 )
 
 target_link_libraries(RavenXD-Launcher PRIVATE
     nlohmann_json::nlohmann_json
-    miniz
     d3d11 dxgi d3dcompiler dwmapi winhttp shlwapi version ole32 comctl32 shell32
+    windowscodecs
 )
 
 set_target_properties(RavenXD-Launcher PROPERTIES
