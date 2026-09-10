@@ -2,18 +2,20 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <dwmapi.h>
-#include <tchar.h>
+#include <wincodec.h>
+#include <vector>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
 #include "Launcher.h"
 #include "UI/UI.h"
+#include "DiscordRPC.h"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "windowscodecs.lib")
 
-// ---- D3D11 globals (also used by UI.cpp) ----
 ID3D11Device*            g_pd3dDevice        = nullptr;
 ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain*   g_pSwapChain        = nullptr;
@@ -23,12 +25,9 @@ static HWND              g_hWnd = nullptr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
-// ---- D3D init ----
 static bool CreateDeviceD3D(HWND hWnd) {
     DXGI_SWAP_CHAIN_DESC sd{};
     sd.BufferCount = 2;
-    sd.BufferDesc.Width = 0;
-    sd.BufferDesc.Height = 0;
     sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     sd.BufferDesc.RefreshRate.Numerator = 60;
     sd.BufferDesc.RefreshRate.Denominator = 1;
@@ -76,13 +75,10 @@ static void CreateRTV() {
     }
 }
 
-// ---- Texture loader (WIC-free minimal PNG decode via stb-like approach) ----
-// We use Windows Imaging Component (WIC) since it's built-in.
-#include <wincodec.h>
-#pragma comment(lib, "windowscodecs.lib")
-
-void LoadTextureFromMemory(const unsigned char* data, size_t len, ID3D11ShaderResourceView** out) {
-    if (!data || len == 0) return;
+void LoadTextureFromMemory(const unsigned char* data, size_t len,
+                           ID3D11ShaderResourceView** out)
+{
+    if (!data || len == 0 || !out) return;
 
     IWICImagingFactory* factory = nullptr;
     CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
@@ -134,14 +130,10 @@ void LoadTextureFromMemory(const unsigned char* data, size_t len, ID3D11ShaderRe
         tex->Release();
     }
 
-    conv->Release();
-    frame->Release();
-    decoder->Release();
-    stream->Release();
-    factory->Release();
+    conv->Release(); frame->Release(); decoder->Release();
+    stream->Release(); factory->Release();
 }
 
-// ---- Window proc ----
 static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
@@ -163,25 +155,14 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-// ---- Rounded window (Windows 11) ----
 static void EnableRoundedCorners(HWND hWnd) {
-    // Win11 corner preference
-    enum DWM_WINDOW_CORNER_PREFERENCE_LOCAL {
-        DWMWCP_DEFAULT = 0, DWMWCP_DONOTROUND = 1,
-        DWMWCP_ROUND = 2, DWMWCP_ROUNDSMALL = 3
-    };
-    DWORD pref = DWMWCP_ROUND;
-    DwmSetWindowAttribute(hWnd, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/,
-                          &pref, sizeof(pref));
-
-    // Dark titlebar
+    DWORD pref = 2;
+    DwmSetWindowAttribute(hWnd, 33, &pref, sizeof(pref));
     BOOL dark = TRUE;
-    DwmSetWindowAttribute(hWnd, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/,
-                          &dark, sizeof(dark));
+    DwmSetWindowAttribute(hWnd, 20, &dark, sizeof(dark));
     DwmSetWindowAttribute(hWnd, 19, &dark, sizeof(dark));
 }
 
-// ---- WinMain ----
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -199,13 +180,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     int sy = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
 
     g_hWnd = CreateWindowExW(
-        0, wc.lpszClassName, L"RavenXD Launcher",
+        0, wc.lpszClassName, L"RavenXD",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         sx, sy, W, H,
         nullptr, nullptr, wc.hInstance, nullptr);
 
     if (!g_hWnd) return 1;
-
     EnableRoundedCorners(g_hWnd);
 
     if (!CreateDeviceD3D(g_hWnd)) {
@@ -230,6 +210,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
 
     Launcher launcher;
     launcher.init();
+
+    // ✅ Khởi động Discord Rich Presence
+    DiscordRPC::I().init();
+    DiscordRPC::I().setIdle();
 
     LARGE_INTEGER freq, last;
     QueryPerformanceFrequency(&freq);
@@ -272,6 +256,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         g_pSwapChain->Present(1, 0);
     }
+
+    // ✅ Tắt Discord RPC
+    DiscordRPC::I().shutdown();
 
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
